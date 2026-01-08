@@ -1,84 +1,45 @@
-import express, { type Request, type Response } from 'express'; 
-// Express: El marco que construye las paredes y puertas de nuestro servidor.
-// Request/Response: Los tipos de TypeScript para saber qué entra y qué sale.
+import express, { Request, Response } from 'express';
+import cors from 'cors';
+import { Groq } from 'groq-sdk';
+import dotenv from 'dotenv';
 
-import cors from 'cors'; 
-// CORS: El guardia de seguridad que permite que tu futuro Frontend (React) hable con este Backend.
+dotenv.config();
 
-import dotenv from 'dotenv'; 
-// Dotenv: El bibliotecario que busca tus llaves secretas en el archivo .env.
+const app = express();
+app.use(cors());
+app.use(express.json());
 
-import Groq from 'groq-sdk'; 
-// Groq: La nueva herramienta que nos conecta con el modelo Llama 3 (el cerebro de la IA).
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-dotenv.config(); 
-// Carga las variables del .env en la memoria del sistema (process.env).
+// DICCIONARIO DE PERSONALIDADES
+const systemPrompts: Record<string, string> = {
+  marco: "Eres Marco Aurelio, emperador y filósofo. Tu tono es sereno, paternal y enfocado en la razón y la justicia social.",
+  seneca: "Eres Séneca. Tu tono es elegante, amable y pedagógico. Eres como un mentor que escribe cartas a un joven amigo sobre la brevedad de la vida.",
+  epicteto: "Eres Epicteto. Tu tono es rudo, directo y sin rodeos. Te enfocas estrictamente en lo que el usuario puede controlar y lo que no."
+};
 
-const app = express(); 
-// Creamos la aplicación servidor.
-
-const port = process.env.PORT || 3000; 
-// Definimos el puerto 3000 como nuestra dirección de escucha.
-
-// --- CONFIGURACIÓN DE LA IA ---
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY }); 
-// Inicializamos Groq con la llave que pegaste en el .env.
-
-app.use(cors()); 
-// Habilitamos CORS para que no haya bloqueos de conexión desde el navegador.
-
-app.use(express.json()); 
-// Le enseñamos al servidor a leer el formato JSON (el idioma en que viajan los datos).
-
-// --- RUTA PRINCIPAL (El Oráculo) ---
-app.post('/ask', async (req: Request, res: Response) => { 
-  // Creamos la ruta POST '/ask'. Es 'async' porque la IA tarda un momento en pensar.
-  
+app.post('/ask', async (req: Request, res: Response) => {
   try {
-    const { prompt } = req.body; 
-    // Extraemos la pregunta que el usuario escribió en el cuerpo del mensaje.
+    // RECIBIMOS 'mentor' DESDE EL FRONTEND
+    const { prompt, mentor } = req.body; 
+    console.log("Datos recibidos:", { mentor, prompt });
 
-    // Llamada a la API de Groq
+    // Seleccionamos el prompt según el mentor, o usamos a Marco por defecto
+    const selectedPrompt = systemPrompts[mentor as string] || systemPrompts.marco;
+
     const completion = await groq.chat.completions.create({
       messages: [
-        {
-          role: "system", 
-          // El 'system' define quién es la IA. Aquí le damos el alma de Marco Aurelio.
-          content: "Eres Marco Aurelio, el emperador estoico. Responde de forma breve, sabia y serena. Usa conceptos del estoicismo para guiar al usuario."
-        },
-        {
-          role: "user", 
-          // El 'user' es lo que el usuario acaba de preguntar.
-          content: prompt
-        }
+        { role: "system", content: selectedPrompt },
+        { role: "user", content: prompt },
       ],
-      model: "llama-3.3-70b-versatile", 
-      // Seleccionamos el modelo. Este es muy inteligente y está disponible gratis en Groq.
+      model: "llama-3.3-70b-versatile",
     });
 
-    // Extraemos el texto de la respuesta de la estructura compleja que devuelve Groq.
-    const answer = completion.choices[0]?.message?.content || "";
-
-    res.json({ answer }); 
-    // Enviamos la respuesta de vuelta al usuario en formato JSON.
-
-  } catch (error: any) {
-    // Si algo falla (ej: internet caído), atrapamos el error aquí.
-    console.error("ERROR EN EL SERVIDOR:", error.message);
-    
-    res.status(500).json({ 
-      error: 'El oráculo está meditando, intenta luego.',
-      details: error.message 
-    });
+    res.json({ answer: completion.choices[0].message.content });
+  } catch (error) {
+    console.error("Error en Groq:", error);
+    res.status(500).json({ error: "Error en el oráculo" });
   }
 });
 
-// --- RUTA DE PRUEBA ---
-app.get('/', (req: Request, res: Response) => {
-  res.send('Servidor del Coach Estoico (vía Groq) listo y funcionando 🛡️.');
-});
-
-// --- ENCENDIDO ---
-app.listen(port, () => {
-  console.log(`⚡ Coach Estoico escuchando en http://localhost:${port}`);
-});
+app.listen(3000, () => console.log('Servidor en http://localhost:3000'));
