@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Añade esto para forzar un fondo si nada más funciona */
+body {
+  background-color: #e5e7eb !important;
+  margin: 0;
+  padding: 0;
+}
