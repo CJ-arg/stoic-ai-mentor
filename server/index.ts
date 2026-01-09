@@ -11,35 +11,80 @@ app.use(express.json());
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// DICCIONARIO DE PERSONALIDADES
-const systemPrompts: Record<string, string> = {
-  marco: "Eres el emperador Marco Aurelio. Responde de forma sobria y breve (máximo 100 palabras). Evita introducciones largas. Usa un tono imperativo pero racional.",
-  seneca: "Eres Séneca. Tus respuestas deben ser directas, como cartas breves a un amigo. No te extiendas más de 2 párrafos (máximo 100 palabras). Prioriza la sabiduría práctica.",
-  epicteto: "Eres Epicteto. Eres rudo, directo y extremadamente breve. No des rodeos. Tu objetivo es que el usuario entienda qué depende de él y qué no en menos de 3 o 4 frases (máximo 100 palabras)."
-}
+// DICCIONARIO DE PERSONALIDADES ESTRUCTURADO (Prompt Engineering Senior)
+const STOIC_PROMPTS: Record<string, string> = {
+  marco: `
+    ROLE: Marcus Aurelius (Roman Emperor & Stoic).
+    TONE: Solemn, rational, and paternal. 
+    CONSTRAINTS: 
+    - Answer in maximum Between 80 and 130 words. 
+    - Stay professional and noble.
+    - Focus on what is within the user's control.
+    - No emojis. No long lists. 
+    - Be extremely concise.
+  `,
+  seneca: `
+    ROLE: Seneca (Statesman and Philosopher).
+    TONE: Practical, encouraging, and direct. 
+    CONSTRAINTS: 
+    - Write as if it were a short letter to a friend. 
+    - Max 80 words. 
+    - Focus on the value of time and tranquility.
+    - Avoid flowery introductions.
+  `,
+  epicteto: `
+    ROLE: Epictetus (Former slave & Stoic teacher).
+    TONE: Blunt, rigorous, and slightly harsh. 
+    CONSTRAINTS: 
+    - Be very direct. No small talk. 
+    - Max 50 words. 
+    - Remind the user that their opinion of the event is the problem, not the event itself.
+  `
+};
 
 app.post('/ask', async (req: Request, res: Response) => {
   try {
-    // RECIBIMOS 'mentor' DESDE EL FRONTEND
-    const { prompt, mentor } = req.body; 
-    console.log("Datos recibidos:", { mentor, prompt });
+    const { prompt, mentor, language = 'es' } = req.body;
 
-    // Seleccionamos el prompt según el mentor, o usamos a Marco por defecto
-    const selectedPrompt = systemPrompts[mentor as string] || systemPrompts.marco;
+    // 1. Manejo del "Warm up" (Despertador del servidor)
+    if (prompt === "Wake up" || prompt === "Despierta") {
+      console.log("Servidor despertado con éxito.");
+      return res.json({ answer: "Logos online." });
+    }
 
+    // 2. Selección del Prompt Base
+    const basePrompt = STOIC_PROMPTS[mentor as string] || STOIC_PROMPTS.marco;
+
+    // 3. Inyección dinámica de Idioma (I18n técnica)
+    const systemPrompt = `
+      ${basePrompt}
+      LANGUAGE: You must respond strictly in ${language === 'en' ? 'English' : 'Spanish'}.
+      Maintain historical accuracy and a stoic demeanor at all times.
+    `;
+
+    console.log(`Petición recibida: [Mentor: ${mentor}] [Idioma: ${language}]`);
+
+    // 4. Llamada a Groq con parámetros optimizados
     const completion = await groq.chat.completions.create({
       messages: [
-        { role: "system", content: selectedPrompt },
+        { role: "system", content: systemPrompt },
         { role: "user", content: prompt },
       ],
       model: "llama-3.3-70b-versatile",
+      temperature: 0.6, // Equilibrio entre creatividad y rigor
+      max_tokens: 200,   // Garantiza respuestas cortas y eficientes
     });
 
     res.json({ answer: completion.choices[0].message.content });
   } catch (error) {
-    console.error("Error en Groq:", error);
-    res.status(500).json({ error: "Error en el oráculo" });
+    console.error("Error en Groq SDK:", error);
+    res.status(500).json({ error: "Error en el oráculo: El Logos está temporalmente fuera de alcance." });
   }
 });
 
-app.listen(3000, () => console.log('Servidor en http://localhost:3000'));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`--- Servidor Estoico Online ---`);
+  console.log(`Puerto: ${PORT}`);
+  console.log(`LTI (Logic, Truth, Integrity) ready.`);
+});
