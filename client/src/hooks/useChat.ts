@@ -6,6 +6,8 @@ export interface Message {
   text: string;
 }
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
 const mentorGreetings: Record<string, Record<string, string>> = {
   marco: {
     es: 'Saludos. Soy Marco Aurelio. ¿Qué inquieta tu razón?',
@@ -32,7 +34,7 @@ export const useChat = (initialMentor: string, language: 'es' | 'en' = 'es') => 
       const startTime = Date.now();
       const MIN_LOADING_TIME = 4000; 
       try {
-        await axios.post('http://localhost:3000/ask', { 
+        await axios.post(`${API_URL}/ask`, { 
           prompt: "Wake up", 
           mentor: initialMentor, 
           language 
@@ -63,7 +65,7 @@ export const useChat = (initialMentor: string, language: 'es' | 'en' = 'es') => 
     setMessages(newMessages);
     setLoading(true);
     try {
-      const response = await axios.post('http://localhost:3000/ask', { prompt: text, mentor, language });
+      const response = await axios.post(`${API_URL}/ask`, { prompt: text, mentor, language });
       setMessages([...newMessages, { role: 'bot', text: response.data.answer }]);
     } catch (error) {
       setMessages([...newMessages, { role: 'bot', text: language === 'es' ? 'Error.' : 'Error.' }]);
