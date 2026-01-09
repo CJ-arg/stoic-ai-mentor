@@ -1,5 +1,5 @@
-import { RefObject } from 'react';
-import { Message } from '../hooks/useChat';
+import type { RefObject } from 'react';
+import type { Message } from '../hooks/useChat';
 
 interface Props {
   messages: Message[];
