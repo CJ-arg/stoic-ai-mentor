@@ -32,7 +32,7 @@ export const useChat = (initialMentor: string, language: 'es' | 'en' = 'es') => 
   useEffect(() => {
     const wakeup = async () => {
       const startTime = Date.now();
-      const MIN_LOADING_TIME = 4000; 
+      const MIN_LOADING_TIME = 40000; 
       try {
         await axios.post(`${API_URL}/ask`, { 
           prompt: "Wake up", 
@@ -51,13 +51,13 @@ export const useChat = (initialMentor: string, language: 'es' | 'en' = 'es') => 
       }
     };
     wakeup();
-  }, []); // Solo al montar
+  }, []); // mount only
 
   useEffect(() => {
     if(!isWarmingUp) {
       setMessages([{ role: 'bot', text: mentorGreetings[mentor][language] }]);
     }
-  }, [mentor, language]); // Sincroniza cambios de mentor e idioma
+  }, [mentor, language]); // sync changes of mentor and language
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || loading) return;
