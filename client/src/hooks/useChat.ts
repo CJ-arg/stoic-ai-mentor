@@ -32,7 +32,7 @@ export const useChat = (initialMentor: string, language: 'es' | 'en' = 'es') => 
   useEffect(() => {
     const wakeup = async () => {
       const startTime = Date.now();
-      const MIN_LOADING_TIME = 40000; 
+      const MIN_LOADING_TIME = 4000; 
       try {
         await axios.post(`${API_URL}/ask`, { 
           prompt: "Wake up", 
