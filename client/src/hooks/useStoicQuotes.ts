@@ -118,3 +118,12 @@ export const useStoicQuotes = (intervalMs: number = 7000) => {
   }, [intervalMs]); // Removed quotes.length from here. Timer never resets.
 
   // SENIOR LOGIC: Use modulo operator to calculate which quote to show
+  // quotes[0 % 4] = quotes[0]
+  // quotes[4 % 4] = quotes[0] (loops back smoothly)
+  const currentQuote = quotes[currentIndex % quotes.length];
+
+  return {
+    currentQuote,
+    index: currentIndex // Use this index as 'key' in the component to trigger animations
+  };
+};
