@@ -20,6 +20,28 @@ function App() {
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  /**
+   * Handles language switching with a stoic warning if there is existing chat history
+   */
+  const toggleLanguage = () => {
+    const newLang = lang === 'es' ? 'en' : 'es';
+
+    // If there is more than just the initial greeting, we warn the user
+    if (messages.length > 1) {
+      const confirmMsg = lang === 'es'
+        ? "¿Acaso crees que puedo hablar dos lenguas a la vez sin perder la razón? Para cambiar de lengua debo despejar mi mente y borrar el historial. ¿Procedemos?"
+        : "Do you think I can speak two languages at once without losing my mind? To change tongues, I must clear my mind and the history. Shall we proceed?";
+
+      if (window.confirm(confirmMsg)) {
+        clearChat(); // Clears localStorage and resets state via hook
+        setLang(newLang);
+      }
+    } else {
+      // If it's just the greeting, change it directly
+      setLang(newLang);
+    }
+  };
+
   // WAKE-UP CALL: Triggered as soon as the app mounts to wake up the Render server
   useEffect(() => {
     const wakeUpServer = async () => {
@@ -50,7 +72,7 @@ function App() {
         </h1>
 
         <div className="flex gap-4 items-center">
-          <button onClick={() => setLang(lang === 'es' ? 'en' : 'es')} className="text-[10px] font-bold uppercase tracking-widest opacity-70 hover:opacity-100">
+          <button onClick={toggleLanguage} className="text-[10px] font-bold uppercase tracking-widest opacity-70 hover:opacity-100">
             {lang === 'es' ? 'English' : 'Español'}
           </button>
           <button onClick={() => setDarkMode(!darkMode)} className="text-xl">
