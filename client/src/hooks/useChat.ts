@@ -29,25 +29,41 @@ export const useChat = (initialMentor: string, language: 'es' | 'en' = 'es') => 
   const [loading, setLoading] = useState(false);
   const [isWarmingUp, setIsWarmingUp] = useState(true);
 
-  useEffect(() => {
+ useEffect(() => {
     const wakeup = async () => {
       const startTime = Date.now();
       const MIN_LOADING_TIME = 4000; 
+      const MAX_LOADING_TIME = 12000; // Desbloqueo forzado a los 12 seg
+
+      // 1. Creamos un temporizador de seguridad (Safety Timer)
+      const safetyTimer = setTimeout(() => {
+        setIsWarmingUp(false);
+        setMessages([{ role: 'bot', text: mentorGreetings[initialMentor][language] }]);
+        console.log("Safety unlock: Server taking too long, proceeding anyway.");
+      }, MAX_LOADING_TIME);
+
       try {
+        // 2. Intentamos el despertar real
         await axios.post(`${API_URL}/ask`, { 
           prompt: "Wake up", 
           mentor: initialMentor, 
           language 
         });
-      } catch (e) { 
-        console.log("Servidor despertando...");
-      } finally { 
+        
+        // Si el servidor responde ANTES del MAX_LOADING_TIME:
+        clearTimeout(safetyTimer); // Cancelamos el desbloqueo forzado
+        
         const elapsedTime = Date.now() - startTime;
         const remainingTime = Math.max(0, MIN_LOADING_TIME - elapsedTime);
+        
         setTimeout(() => {
           setIsWarmingUp(false);
           setMessages([{ role: 'bot', text: mentorGreetings[initialMentor][language] }]);
         }, remainingTime);
+
+      } catch (e) { 
+        console.log("Server still waking up...");
+        // No hacemos nada, el safetyTimer o el finally se encargarán
       }
     };
     wakeup();

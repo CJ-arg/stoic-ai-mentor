@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { useChat } from '../hooks/useChat'; // Asegúrate que el nombre del archivo coincida
+import { useChat } from '../hooks/useChat'; 
 import { LoadingScreen } from '../components/LoadingScreen';
+import axios from 'axios'; // Import axios for the wake-up call
 
 const mentors = [
   { id: 'marco', name: 'Marco Aurelio', title: 'Emperador', img: '/Marco.png' },
@@ -8,14 +9,29 @@ const mentors = [
   { id: 'epicteto', name: 'Epicteto', title: 'Resiliente', img: '/Epicteto.png' },
 ];
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
 function App() {
   const [lang, setLang] = useState<'es' | 'en'>('es');
   const [darkMode, setDarkMode] = useState(false);
   
-  // Pasamos lang al hook para que los saludos funcionen
   const { mentor, setMentor, messages, loading, sendMessage, isWarmingUp } = useChat('marco', lang);
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // WAKE-UP CALL: Triggered as soon as the app mounts to wake up the Render server
+  useEffect(() => {
+    const wakeUpServer = async () => {
+      try {
+        // We call the quotes endpoint immediately to gain time
+        await axios.get(`${API_URL}/api/translated-quote`);
+        
+      } catch (e) {
+        
+      }
+    };
+    wakeUpServer();
+  }, []);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
