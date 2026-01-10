@@ -23,72 +23,99 @@ const mentorGreetings: Record<string, Record<string, string>> = {
   }
 };
 
+/**
+ * Helper to manage storage keys per mentor
+ */
+const getStorageKey = (mentor: string) => `stoic_chat_history_${mentor}`;
+
 export const useChat = (initialMentor: string, language: 'es' | 'en' = 'es') => {
   const [mentor, setMentor] = useState(initialMentor);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [isWarmingUp, setIsWarmingUp] = useState(true);
 
- useEffect(() => {
+  // EFFECT: Load chat history from localStorage when mentor or language changes
+  useEffect(() => {
+    const savedChat = localStorage.getItem(getStorageKey(mentor));
+    if (savedChat) {
+      setMessages(JSON.parse(savedChat));
+    } else {
+      // If no history exists, set the initial greeting
+      setMessages([{ role: 'bot', text: mentorGreetings[mentor][language] }]);
+    }
+  }, [mentor, language]);
+
+  // EFFECT: Persist messages to localStorage whenever the chat updates
+  useEffect(() => {
+    if (messages.length > 0) {
+      localStorage.setItem(getStorageKey(mentor), JSON.stringify(messages));
+    }
+  }, [messages, mentor]);
+
+  // EFFECT: Initial server wake-up call with safety timeout
+  useEffect(() => {
     const wakeup = async () => {
       const startTime = Date.now();
-      const MIN_LOADING_TIME = 4000; 
-      const MAX_LOADING_TIME = 12000; // Desbloqueo forzado a los 12 seg
+      const MIN_LOADING_TIME = 4000;
+      const MAX_WAIT_TIME = 12000; // Force unlock after 12s for better UX
 
-      // 1. Creamos un temporizador de seguridad (Safety Timer)
+      // Safety timeout to unlock UI if server is extremely slow
       const safetyTimer = setTimeout(() => {
         setIsWarmingUp(false);
-        setMessages([{ role: 'bot', text: mentorGreetings[initialMentor][language] }]);
-        console.log("Safety unlock: Server taking too long, proceeding anyway.");
-      }, MAX_LOADING_TIME);
+      }, MAX_WAIT_TIME);
 
       try {
-        // 2. Intentamos el despertar real
         await axios.post(`${API_URL}/ask`, { 
           prompt: "Wake up", 
           mentor: initialMentor, 
           language 
         });
         
-        // Si el servidor responde ANTES del MAX_LOADING_TIME:
-        clearTimeout(safetyTimer); // Cancelamos el desbloqueo forzado
-        
+        clearTimeout(safetyTimer);
         const elapsedTime = Date.now() - startTime;
         const remainingTime = Math.max(0, MIN_LOADING_TIME - elapsedTime);
-        
-        setTimeout(() => {
-          setIsWarmingUp(false);
-          setMessages([{ role: 'bot', text: mentorGreetings[initialMentor][language] }]);
-        }, remainingTime);
 
+        setTimeout(() => setIsWarmingUp(false), remainingTime);
       } catch (e) { 
-        console.log("Server still waking up...");
-        // No hacemos nada, el safetyTimer o el finally se encargarán
+        console.log("Server waking up...");
+        // Safety timer will handle the unlock if request fails
       }
     };
     wakeup();
-  }, []); // mount only
-
-  useEffect(() => {
-    if(!isWarmingUp) {
-      setMessages([{ role: 'bot', text: mentorGreetings[mentor][language] }]);
-    }
-  }, [mentor, language]); // sync changes of mentor and language
+  }, []);
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || loading) return;
-    const newMessages: Message[] = [...messages, { role: 'user', text }];
+
+    const userMsg: Message = { role: 'user', text };
+    const newMessages = [...messages, userMsg];
     setMessages(newMessages);
     setLoading(true);
+
     try {
-      const response = await axios.post(`${API_URL}/ask`, { prompt: text, mentor, language });
-      setMessages([...newMessages, { role: 'bot', text: response.data.answer }]);
+      const response = await axios.post(`${API_URL}/ask`, { 
+        prompt: text, 
+        mentor, 
+        language 
+      });
+      
+      const botMsg: Message = { role: 'bot', text: response.data.answer };
+      setMessages(prev => [...prev, botMsg]);
     } catch (error) {
-      setMessages([...newMessages, { role: 'bot', text: language === 'es' ? 'Error.' : 'Error.' }]);
+      const errorMsg = language === 'es' ? 'El oráculo está silenciado temporalmente.' : 'The oracle is temporarily silent.';
+      setMessages(prev => [...prev, { role: 'bot', text: errorMsg }]);
     } finally {
       setLoading(false);
     }
   };
 
-  return { mentor, setMentor, messages, loading, sendMessage, isWarmingUp };
+  /**
+   * Clears history for the current mentor
+   */
+  const clearChat = () => {
+    localStorage.removeItem(getStorageKey(mentor));
+    setMessages([{ role: 'bot', text: mentorGreetings[mentor][language] }]);
+  };
+
+  return { mentor, setMentor, messages, loading, sendMessage, isWarmingUp, clearChat };
 };
