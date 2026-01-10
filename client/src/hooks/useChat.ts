@@ -34,16 +34,27 @@ export const useChat = (initialMentor: string, language: 'es' | 'en' = 'es') => 
   const [loading, setLoading] = useState(false);
   const [isWarmingUp, setIsWarmingUp] = useState(true);
 
-  // EFFECT: Load chat history from localStorage when mentor or language changes
-  useEffect(() => {
-    const savedChat = localStorage.getItem(getStorageKey(mentor));
-    if (savedChat) {
-      setMessages(JSON.parse(savedChat));
-    } else {
-      // If no history exists, set the initial greeting
+  // useChat.ts
+
+// EFFECT: Load chat history from localStorage when mentor or language changes
+useEffect(() => {
+  const savedChat = localStorage.getItem(getStorageKey(mentor));
+  
+  if (savedChat) {
+    const parsedMessages = JSON.parse(savedChat);
+    
+    // LOGIC: If the chat only has ONE message and it's a bot greeting,
+    // we check if we need to update its language.
+    if (parsedMessages.length === 1 && parsedMessages[0].role === 'bot') {
       setMessages([{ role: 'bot', text: mentorGreetings[mentor][language] }]);
+    } else {
+      setMessages(parsedMessages);
     }
-  }, [mentor, language]);
+  } else {
+    // If no history exists, set the initial greeting in the current language
+    setMessages([{ role: 'bot', text: mentorGreetings[mentor][language] }]);
+  }
+}, [mentor, language]); // This will now correctly react to language changes
 
   // EFFECT: Persist messages to localStorage whenever the chat updates
   useEffect(() => {
