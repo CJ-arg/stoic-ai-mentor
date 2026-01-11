@@ -1,5 +1,6 @@
 // src/components/ChatWindow.tsx
-import { useState, FormEvent, RefObject } from 'react';
+import { useState } from 'react';
+import type { FormEvent, RefObject } from 'react';
 import type { Message } from '../hooks/useChat';
 
 interface Props {
@@ -54,8 +55,8 @@ export const ChatWindow = ({
             if (window.confirm(confirmMsg)) onClear();
           }}
           className={`group flex items-center gap-2 px-3 py-1 rounded-full border transition-all duration-300 ${darkMode
-              ? 'border-stone-700 text-stone-500 hover:border-red-900 hover:text-red-400'
-              : 'border-stone-300 text-stone-500 hover:border-red-200 hover:text-red-600'
+            ? 'border-stone-700 text-stone-500 hover:border-red-900 hover:text-red-400'
+            : 'border-stone-300 text-stone-500 hover:border-red-200 hover:text-red-600'
             }`}
         >
           {/* Trash Icon Asset */}
@@ -77,8 +78,8 @@ export const ChatWindow = ({
         {messages.map((msg, index) => (
           <div key={index} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[85%] p-3 lg:p-4 rounded-xl text-sm lg:text-base leading-relaxed shadow-sm ${msg.role === 'user'
-                ? 'bg-stone-700 text-white rounded-br-none'
-                : `${darkMode ? 'bg-stone-800 text-stone-200 border-stone-700' : 'bg-white text-stone-900 border-stone-200'} border rounded-bl-none font-serif`
+              ? 'bg-stone-700 text-white rounded-br-none'
+              : `${darkMode ? 'bg-stone-800 text-stone-200 border-stone-700' : 'bg-white text-stone-900 border-stone-200'} border rounded-bl-none font-serif`
               }`}>
               {msg.text}
             </div>
@@ -101,8 +102,8 @@ export const ChatWindow = ({
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           className={`flex-1 border rounded-xl px-4 py-2 text-sm outline-none transition-all ${darkMode
-              ? 'bg-stone-800 border-stone-700 text-stone-200'
-              : 'bg-white border-stone-300 focus:border-stone-800'
+            ? 'bg-stone-800 border-stone-700 text-stone-200'
+            : 'bg-white border-stone-300 focus:border-stone-800'
             }`}
           placeholder={lang === 'es' ? "Haz tu pregunta..." : "Ask your question..."}
         />
