@@ -33,9 +33,6 @@ export const useStoicSession = (initialMentor: string, language: 'es' | 'en' = '
 
     const turnCount = Math.floor((messages.length - 1) / 2); // Subtract greeting, divide by 2 (User+Bot)
 
-    // DEBUG: Monitor Turn Count
-    console.log(`[StoicSession] Msgs: ${messages.length}, Turn: ${turnCount}`);
-
     // Initialize or restore session
     useEffect(() => {
         const initSession = async () => {

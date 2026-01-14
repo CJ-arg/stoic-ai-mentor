@@ -70,13 +70,7 @@ function App() {
   if (isWarmingUp) return <LoadingScreen />;
 
   return (
-    <div className="h-screen w-screen transition-colors duration-500 flex flex-col p-4 md:p-6 overflow-hidden font-sans relative">
-      {/* DEBUG OVERLAY */}
-      <div className={`absolute top-0 right-0 p-2 text-xs font-mono z-[9999] pointer-events-none ${darkMode ? 'bg-red-900/80 text-white' : 'bg-red-200/80 text-red-900'}`}>
-        DEBUG: Msgs={messages.length} | Turn={turnCount} | ID={mentorId} | SessID={messages.length > 0 ? messages[0].sessionId : 'N/A'}
-      </div>
-
-      <div className={`absolute inset-0 -z-10 ${darkMode ? 'bg-stone-950 text-stone-200' : 'bg-stone-200 text-stone-900'}`} />
+    <div className={`h-screen w-screen transition-colors duration-500 flex flex-col p-4 md:p-6 overflow-hidden font-sans ${darkMode ? 'bg-stone-950 text-stone-200' : 'bg-stone-200 text-stone-900'}`}>
 
       {/* HEADER SECTION */}
       <header className="shrink-0 flex justify-between items-center mb-6 border-b-2 border-stone-800 pb-1 max-w-6xl mx-auto w-full">
