@@ -1,7 +1,8 @@
 // src/components/ChatWindow.tsx
 import { useState } from 'react';
 import type { FormEvent, RefObject } from 'react';
-import type { Message } from '../hooks/useChat';
+import type { Message } from '../db'; // Updated import to use shared DB type
+import DepthCounter from './DepthCounter';
 
 interface Props {
   mentorName: string;
@@ -12,6 +13,10 @@ interface Props {
   lang: 'es' | 'en';
   onClear: () => void;
   onSendMessage: (text: string) => void;
+  // New Socratic Props
+  currentTurn: number;
+  maxTurns: number;
+  onSynthesize: () => void;
 }
 
 export const ChatWindow = ({
@@ -22,17 +27,17 @@ export const ChatWindow = ({
   darkMode,
   lang,
   onClear,
-  onSendMessage
+  onSendMessage,
+  currentTurn,
+  maxTurns,
+  onSynthesize
 }: Props) => {
-  // Local state for the input field to prevent whole-app re-renders on every keystroke
   const [inputValue, setInputValue] = useState('');
+  const isSessionComplete = currentTurn >= maxTurns;
 
-  /**
-   * Handles the message submission and clears local input state
-   */
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (!inputValue.trim() || loading) return;
+    if (!inputValue.trim() || loading || isSessionComplete) return;
     onSendMessage(inputValue);
     setInputValue('');
   };
@@ -41,17 +46,22 @@ export const ChatWindow = ({
     <section className={`flex-1 shadow-xl rounded-2xl flex flex-col h-[500px] lg:h-full overflow-hidden border self-stretch mb-2 transition-colors duration-300 ${darkMode ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-300'
       }`}>
 
-      {/* CHAT HEADER: Includes Mentor Name and Clear History Action */}
+      {/* CHAT HEADER */}
       <div className={`p-3 px-5 flex justify-between items-center shrink-0 border-b ${darkMode ? 'bg-stone-800 border-stone-700' : 'bg-stone-100 border-stone-200'
         }`}>
-        <h2 className={`font-serif text-[11px] uppercase tracking-[0.2em] font-bold ${darkMode ? 'text-stone-300' : 'text-stone-800'
-          }`}>
-          {mentorName}
-        </h2>
+        <div>
+          <h2 className={`font-serif text-[11px] uppercase tracking-[0.2em] font-bold ${darkMode ? 'text-stone-300' : 'text-stone-800'
+            }`}>
+            {mentorName}
+          </h2>
+        </div>
+
+        {/* Depth Counter in Center/Right */}
+        <DepthCounter currentTurn={currentTurn} maxTurns={maxTurns} />
 
         <button
           onClick={() => {
-            const confirmMsg = lang === 'es' ? '¿Borrar historial?' : 'Clear history?';
+            const confirmMsg = lang === 'es' ? '¿Reiniciar sesión?' : 'Reset session?';
             if (window.confirm(confirmMsg)) onClear();
           }}
           className={`group flex items-center gap-2 px-3 py-1 rounded-full border transition-all duration-300 ${darkMode
@@ -59,17 +69,16 @@ export const ChatWindow = ({
             : 'border-stone-300 text-stone-500 hover:border-red-200 hover:text-red-600'
             }`}
         >
-          {/* Trash Icon Asset */}
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
           </svg>
           <span className="text-[10px] font-bold uppercase tracking-wider">
-            {lang === 'es' ? 'Limpiar' : 'Clear'}
+            {lang === 'es' ? 'Reiniciar' : 'Reset'}
           </span>
         </button>
       </div>
 
-      {/* MESSAGES VIEWPORT: Renders chat history with auto-scroll target */}
+      {/* MESSAGES VIEWPORT */}
       <div
         ref={scrollRef}
         className={`flex-1 overflow-y-auto p-4 lg:p-6 space-y-4 transition-colors duration-300 ${darkMode ? 'bg-stone-950' : 'bg-stone-50'
@@ -92,29 +101,43 @@ export const ChatWindow = ({
         )}
       </div>
 
-      {/* INPUT FORM: Local input management for performance optimization */}
-      <form
-        onSubmit={handleSubmit}
-        className={`p-3 border-t flex gap-2 shrink-0 ${darkMode ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-100'
-          }`}
-      >
-        <input
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          className={`flex-1 border rounded-xl px-4 py-2 text-sm outline-none transition-all ${darkMode
-            ? 'bg-stone-800 border-stone-700 text-stone-200'
-            : 'bg-white border-stone-300 focus:border-stone-800'
-            }`}
-          placeholder={lang === 'es' ? "Haz tu pregunta..." : "Ask your question..."}
-        />
-        <button
-          type="submit"
-          className={`px-5 py-2 rounded-xl font-bold text-xs uppercase transition-all ${darkMode ? 'bg-stone-200 text-stone-900' : 'bg-stone-800 text-white'
-            }`}
-        >
-          →
-        </button>
-      </form>
+      {/* INPUT FORM OR SYNTHESIS BUTTON */}
+      <div className={`p-3 border-t shrink-0 ${darkMode ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-100'
+        }`}>
+        {isSessionComplete ? (
+          <button
+            onClick={onSynthesize}
+            disabled={loading}
+            className={`w-full py-4 rounded-xl font-serif text-lg tracking-widest uppercase transition-all duration-500 animate-slide-up ${darkMode
+                ? 'bg-stone-100 text-stone-900 hover:bg-white shadow-[0_0_20px_rgba(255,255,255,0.1)]'
+                : 'bg-stone-800 text-white hover:bg-black shadow-[0_0_20px_rgba(0,0,0,0.2)]'
+              }`}
+          >
+            {loading
+              ? (lang === 'es' ? 'Sintetizando...' : 'Synthesizing...')
+              : (lang === 'es' ? 'Extraer Conclusión Estoica' : 'Extract Stoic Conclusion')}
+          </button>
+        ) : (
+          <form onSubmit={handleSubmit} className="flex gap-2">
+            <input
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              className={`flex-1 border rounded-xl px-4 py-2 text-sm outline-none transition-all ${darkMode
+                ? 'bg-stone-800 border-stone-700 text-stone-200'
+                : 'bg-white border-stone-300 focus:border-stone-800'
+                }`}
+              placeholder={lang === 'es' ? "Haz tu pregunta..." : "Ask your question..."}
+            />
+            <button
+              type="submit"
+              className={`px-5 py-2 rounded-xl font-bold text-xs uppercase transition-all ${darkMode ? 'bg-stone-200 text-stone-900' : 'bg-stone-800 text-white'
+                }`}
+            >
+              →
+            </button>
+          </form>
+        )}
+      </div>
     </section>
   );
 };

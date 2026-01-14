@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useChat } from '../hooks/useChat';
+import { useStoicSession } from '../hooks/useStoicSession';
 import { LoadingScreen } from '../components/LoadingScreen';
 import { Sidebar } from '../components/Sidebar';
 import { ChatWindow } from '../components/ChatWindow';
@@ -19,57 +19,49 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 function App() {
   const [lang, setLang] = useState<'es' | 'en'>('es');
   const [darkMode, setDarkMode] = useState(false);
+  const [mentorId, setMentorId] = useState('marco');
 
   // Hook logic orchestration
   const {
-    mentor,
-    setMentor,
     messages,
     loading,
     sendMessage,
     isWarmingUp,
-    clearChat
-  } = useChat('marco', lang);
+    resetSession,
+    turnCount,
+    synthesizeWisdom
+  } = useStoicSession(mentorId, lang);
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
   /**
-   * Handles language switching with a warning if there is existing chat history.
-   * This ensures the AI context remains consistent within a single language.
+   * Handles language switching.
    */
   const toggleLanguage = () => {
     const newLang = lang === 'es' ? 'en' : 'es';
-    if (messages.length > 1) {
-      const confirmMsg = lang === 'es'
-        ? "¿Acaso crees que puedo hablar dos lenguas a la vez sin perder la razón? Para cambiar de lengua debo despejar mi mente y borrar el historial. ¿Procedemos?"
-        : "Do you think I can speak two languages at once without losing my mind? To change tongues, I must clear my mind and the history. Shall we proceed?";
-
-      if (window.confirm(confirmMsg)) {
-        clearChat(); // Clears persistence and state
-        setLang(newLang);
-      }
-    } else {
+    // Ideally we should warn or reset session here too, but for simplicity:
+    if (window.confirm(lang === 'es' ? "¿Cambiar idioma? Esto reiniciará la sesión." : "Change language? This will reset the session.")) {
+      resetSession();
       setLang(newLang);
     }
   };
 
   /**
-   * WAKE-UP CALL: Effect to ping the server as soon as the app loads to avoid 
-   * delays caused by server cold starts (common in free-tier hosting).
+   * WAKE-UP CALL: Effect to ping the server as soon as the app loads
    */
   useEffect(() => {
     const wakeUpServer = async () => {
       try {
         await axios.get(`${API_URL}/api/translated-quote`);
       } catch (e) {
-        // Silent catch: the goal is just to trigger the server boot
+        // Silent catch
       }
     };
     wakeUpServer();
   }, []);
 
   /**
-   * AUTO-SCROLL: Keeps the chat view locked to the most recent messages.
+   * AUTO-SCROLL
    */
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
@@ -78,7 +70,13 @@ function App() {
   if (isWarmingUp) return <LoadingScreen />;
 
   return (
-    <div className={`h-screen w-screen transition-colors duration-500 flex flex-col p-4 md:p-6 overflow-hidden font-sans ${darkMode ? 'bg-stone-950 text-stone-200' : 'bg-stone-200 text-stone-900'}`}>
+    <div className="h-screen w-screen transition-colors duration-500 flex flex-col p-4 md:p-6 overflow-hidden font-sans relative">
+      {/* DEBUG OVERLAY */}
+      <div className={`absolute top-0 right-0 p-2 text-xs font-mono z-[9999] pointer-events-none ${darkMode ? 'bg-red-900/80 text-white' : 'bg-red-200/80 text-red-900'}`}>
+        DEBUG: Msgs={messages.length} | Turn={turnCount} | ID={mentorId} | SessID={messages.length > 0 ? messages[0].sessionId : 'N/A'}
+      </div>
+
+      <div className={`absolute inset-0 -z-10 ${darkMode ? 'bg-stone-950 text-stone-200' : 'bg-stone-200 text-stone-900'}`} />
 
       {/* HEADER SECTION */}
       <header className="shrink-0 flex justify-between items-center mb-6 border-b-2 border-stone-800 pb-1 max-w-6xl mx-auto w-full">
@@ -100,20 +98,23 @@ function App() {
       <main className="flex flex-col lg:flex-row gap-6 w-full max-w-4xl mx-auto flex-1 overflow-hidden items-start">
         <Sidebar
           mentors={mentors}
-          currentMentor={mentor}
-          setMentor={setMentor}
+          currentMentor={mentorId}
+          setMentor={setMentorId}
           darkMode={darkMode}
         />
 
         <ChatWindow
-          mentorName={mentors.find(m => m.id === mentor)?.name || ''}
+          mentorName={mentors.find(m => m.id === mentorId)?.name || ''}
           messages={messages}
           loading={loading}
           darkMode={darkMode}
           lang={lang}
-          onClear={clearChat} // Refactored prop name to match ChatWindow interface
+          onClear={resetSession}
           onSendMessage={sendMessage}
           scrollRef={scrollRef}
+          currentTurn={turnCount}
+          maxTurns={5}
+          onSynthesize={synthesizeWisdom}
         />
       </main>
     </div>

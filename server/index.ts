@@ -54,15 +54,15 @@ app.get('/api/translated-quote', async (_req: Request, res: Response) => {
     // 2. Contextual Translation (LLM Orchestration)
     const translationCompletion = await groq.chat.completions.create({
       messages: [
-        { 
-          role: "system", 
-          content: "You are a professional translator specializing in philosophy. Translate the following stoic quote to Spanish. Maintain the solemn and profound tone. Return ONLY the translated text, no quotes or explanations." 
+        {
+          role: "system",
+          content: "You are a professional translator specializing in philosophy. Translate the following stoic quote to Spanish. Maintain the solemn and profound tone. Return ONLY the translated text, no quotes or explanations."
         },
         { role: "user", content: englishText },
       ],
       model: "llama-3.3-70b-versatile",
-      temperature: 0.3, 
-      max_tokens: 150, 
+      temperature: 0.3,
+      max_tokens: 150,
     });
 
     const spanishText = translationCompletion.choices[0].message.content;
@@ -81,39 +81,66 @@ app.get('/api/translated-quote', async (_req: Request, res: Response) => {
   }
 });
 
-// MAIN ENDPOINT: /ask (Handles Chat and Wake-up Call)
+// MAIN ENDPOINT: /ask (Handles Chat, Wake-up Call, and Synthesis)
 app.post('/ask', async (req: Request, res: Response) => {
   try {
-    const { prompt, mentor, language = 'es' } = req.body;
+    const { prompt, mentor, language = 'es', turnCount = 0, isSynthesis = false, history = [] } = req.body;
 
     // 1. FAST RESPONSE: Wake-up call handling
-    // This must return immediately to unlock the Frontend UI
     if (prompt === "Wake up" || prompt === "Despierta") {
       console.log("!!! Wake-up call received - Unlocking Frontend");
       return res.json({ answer: "Logos online." });
     }
 
     // 2. Base Prompt Selection
-    const basePrompt = STOIC_PROMPTS[mentor as string] || STOIC_PROMPTS.marco;
+    let basePrompt = STOIC_PROMPTS[mentor as string] || STOIC_PROMPTS.marco;
 
-    // 3. Dynamic Language Injection
+    // 3. Dynamic Prompt Injection based on Session State
+    let dynamicInstruction = "";
+
+    if (isSynthesis) {
+      dynamicInstruction = `
+        TASK: SYNTHESIZE the conversation into a single profound stoic truth.
+        - Review the user's struggle and your previous advice.
+        - Create a custom quote or maxim that solves their specific problem.
+        - Start with "Here is your truth:" or "He aquí tu verdad:".
+        - MAX 50 words. Be extremely impactful.
+        `;
+    } else {
+      // Progressive Socratic Logic
+      if (turnCount < 2) {
+        dynamicInstruction = "Phase: EXPLORATION. Ask probing questions to understand the root cause. Do not give advice yet.";
+      } else if (turnCount < 4) {
+        dynamicInstruction = "Phase: CHALLENGE. Challenge the user's perceptions. Show them the dichotomy of control.";
+      } else {
+        dynamicInstruction = "Phase: CONVERGENCE. We are close to the end. Prepare the user for a conclusion. Be firm.";
+      }
+    }
+
+    // 4. Construct System Prompt
     const systemPrompt = `
       ${basePrompt}
       LANGUAGE: You must respond strictly in ${language === 'en' ? 'English' : 'Spanish'}.
+      ${dynamicInstruction}
       Maintain historical accuracy and a stoic demeanor at all times.
     `;
 
-    console.log(`Request received: [Mentor: ${mentor}] [Language: ${language}]`);
+    console.log(`Request received: [Mentor: ${mentor}] [Turn: ${turnCount}] [Synthesis: ${isSynthesis}]`);
 
-    // 4. Call to Groq with optimized parameters
+    // 5. Call to Groq
+    // Prepare messages including history for context if available
+    const messages = [
+      { role: "system", content: systemPrompt },
+      // Map history to OpenAI format if provided, otherwise just current prompt
+      ...(history.length > 0 ? history.map((m: any) => ({ role: m.role, content: m.content || m.text })) : []),
+      { role: "user", content: prompt },
+    ];
+
     const completion = await groq.chat.completions.create({
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: prompt },
-      ],
+      messages: messages as any,
       model: "llama-3.3-70b-versatile",
-      temperature: 0.6, 
-      max_tokens: 200, 
+      temperature: isSynthesis ? 0.3 : 0.6, // Lower temperature for synthesis
+      max_tokens: 300,
     });
 
     res.json({ answer: completion.choices[0].message.content });
