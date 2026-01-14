@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { db, type Message } from '../db';
+import { db } from '../db';
 import { useLiveQuery } from 'dexie-react-hooks';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
