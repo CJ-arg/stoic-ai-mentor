@@ -159,11 +159,17 @@ export const useStoicSession = (initialMentor: string, language: 'es' | 'en' = '
         setLoading(true);
 
         try {
+            const history = messages.map(m => ({
+                role: m.role === 'bot' ? 'assistant' : 'user',
+                content: m.text
+            }));
+
             const response = await axios.post(`${API_URL}/ask`, {
                 prompt: "Synthesize our conversation into one profound stoic truth.",
                 mentor: initialMentor,
                 language,
-                isSynthesis: true
+                isSynthesis: true,
+                history
             });
 
             await db.sessions.update(sessionId, {
