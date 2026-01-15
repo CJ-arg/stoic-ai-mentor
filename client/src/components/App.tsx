@@ -29,7 +29,9 @@ function App() {
     isWarmingUp,
     resetSession,
     turnCount,
-    synthesizeWisdom
+    synthesizeWisdom,
+    finishSession,
+    isSynthesized
   } = useStoicSession(mentorId, lang);
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -75,7 +77,7 @@ function App() {
       {/* HEADER SECTION */}
       <header className="shrink-0 flex justify-between items-center mb-6 border-b-2 border-stone-800 pb-1 max-w-6xl mx-auto w-full">
         <h1 className="text-2xl md:text-3xl font-serif tracking-tighter uppercase font-black italic">
-          {lang === 'es' ? 'Mentor Estoico' : 'Stoic Mentor'}
+          {lang === 'es' ? 'Sesion Estoica' : 'Stoic Session'}
         </h1>
 
         <div className="flex gap-4 items-center">
@@ -109,6 +111,8 @@ function App() {
           currentTurn={turnCount}
           maxTurns={5}
           onSynthesize={synthesizeWisdom}
+          isSynthesized={isSynthesized}
+          onFinish={finishSession}
         />
       </main>
     </div>

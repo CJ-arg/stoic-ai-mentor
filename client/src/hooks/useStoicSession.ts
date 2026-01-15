@@ -7,16 +7,16 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 const mentorGreetings: Record<string, Record<string, string>> = {
     marco: {
-        es: 'Saludos. Soy Marco Aurelio. ¿Qué inquieta tu razón?',
-        en: 'Greetings. I am Marcus Aurelius. What disturbs your reason?'
+        es: 'Saludos. Soy Marco Aurelio. Iniciemos una sesión de 5 pasos para examinar tu razón. ¿Qué pensamiento inquieta tu ciudadela interior?',
+        en: 'Greetings. I am Marcus Aurelius. Let us begin a 5-step session to examine your reason. What thought disturbs your inner citadel?'
     },
     seneca: {
-        es: 'Soy Séneca. No perdamos el tiempo, ¿qué aflige tu alma?',
-        en: 'I am Seneca. Let us not waste time, what afflicts your soul?'
+        es: 'Soy Séneca. El tiempo es breve, así que dedicaremos 5 diálogos a tu inquietud. No perdamos un segundo, ¿qué aflige tu alma?',
+        en: 'I am Seneca. Time is short, so we will devote 5 dialogues to your concern. Let us not waste a second, what afflicts your soul?'
     },
     epicteto: {
-        es: 'Soy Epicteto. ¿Cuál es tu problema hoy?',
-        en: 'I am Epictetus. What is your problem today?'
+        es: 'Soy Epicteto. Tienes 5 preguntas para que te demuestre tu error. ¿Cuál es tu problema hoy?',
+        en: 'I am Epictetus. You have 5 questions for me to show you your error. What is your problem today?'
     }
 };
 
@@ -31,10 +31,18 @@ export const useStoicSession = (initialMentor: string, language: 'es' | 'en' = '
         [sessionId]
     ) || [];
 
+    // Live query to get current session details
+    const currentSession = useLiveQuery(
+        () => (sessionId ? db.sessions.get(sessionId) : undefined),
+        [sessionId]
+    );
+
     const turnCount = Math.floor((messages.length - 1) / 2); // Subtract greeting, divide by 2 (User+Bot)
 
     // Initialize or restore session
     useEffect(() => {
+        let isMounted = true;
+
         const initSession = async () => {
             // 1. Check if there's an active incomplete session for this mentor
             const activeSession = await db.sessions
@@ -43,8 +51,13 @@ export const useStoicSession = (initialMentor: string, language: 'es' | 'en' = '
                 .filter(session => !session.isCompleted)
                 .last();
 
+            if (!isMounted) return;
+
             if (activeSession) {
-                setSessionId(activeSession.id);
+                // If the current sessionId is already correct, do nothing
+                if (sessionId !== activeSession.id) {
+                    setSessionId(activeSession.id);
+                }
             } else {
                 // 2. Create new session
                 const id = await db.sessions.add({
@@ -52,6 +65,8 @@ export const useStoicSession = (initialMentor: string, language: 'es' | 'en' = '
                     mentor: initialMentor,
                     isCompleted: false
                 });
+
+                if (!isMounted) return;
                 setSessionId(id);
 
                 // 3. Add initial greeting
@@ -65,7 +80,8 @@ export const useStoicSession = (initialMentor: string, language: 'es' | 'en' = '
         };
 
         initSession();
-    }, [initialMentor, language]);
+        return () => { isMounted = false; };
+    }, [initialMentor, language, sessionId]);
 
     // Initial server wake-up (same as before)
     useEffect(() => {
@@ -139,15 +155,10 @@ export const useStoicSession = (initialMentor: string, language: 'es' | 'en' = '
     };
 
     const synthesizeWisdom = async () => {
-        if (!sessionId) return;
+        if (!sessionId || currentSession?.summary) return;
         setLoading(true);
 
         try {
-            // Placeholder for synthesis logic - could be a specific API call
-            // For now, let's just mark complete and maybe add a system message
-
-            // Just mark as completed for now, or trigger a special "synthesis" prompt
-            // Let's ask the AI for a summary
             const response = await axios.post(`${API_URL}/ask`, {
                 prompt: "Synthesize our conversation into one profound stoic truth.",
                 mentor: initialMentor,
@@ -156,15 +167,14 @@ export const useStoicSession = (initialMentor: string, language: 'es' | 'en' = '
             });
 
             await db.sessions.update(sessionId, {
-                summary: response.data.answer,
-                isCompleted: true
+                summary: response.data.answer
             });
 
             // Add the summary as a final message
             await db.messages.add({
                 sessionId,
                 role: 'bot',
-                text: `📝 **SYNTHESIS**: ${response.data.answer}`,
+                text: `SYNTHESIS: ${response.data.answer}`,
                 timestamp: Date.now()
             });
 
@@ -174,6 +184,19 @@ export const useStoicSession = (initialMentor: string, language: 'es' | 'en' = '
             setLoading(false);
         }
     };
+
+    const finishSession = async () => {
+        if (!sessionId) return;
+        setLoading(true);
+        try {
+            await db.sessions.update(sessionId, { isCompleted: true });
+            setSessionId(null); // Trigger fresh session for the UI
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
+    }
 
     const resetSession = async () => {
         // Mark current as completed if not already (abandoned)
@@ -191,7 +214,8 @@ export const useStoicSession = (initialMentor: string, language: 'es' | 'en' = '
         isWarmingUp,
         turnCount,
         synthesizeWisdom,
+        finishSession,
         resetSession,
-        isCompleted: false // We can improve this with a live query on the session itself if needed
+        isSynthesized: !!currentSession?.summary
     };
 };

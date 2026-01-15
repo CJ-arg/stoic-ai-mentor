@@ -100,11 +100,12 @@ app.post('/ask', async (req: Request, res: Response) => {
 
     if (isSynthesis) {
       dynamicInstruction = `
-        TASK: SYNTHESIZE the conversation into a single profound stoic truth.
-        - Review the user's struggle and your previous advice.
-        - Create a custom quote or maxim that solves their specific problem.
-        - Start with "Here is your truth:" or "He aquí tu verdad:".
-        - MAX 50 words. Be extremely impactful.
+        TASK: SYNTHESIZE the entire preceding conversation into a comprehensive Stoic Episteme.
+        - Analyze the specific conflict or doubt the user shared.
+        - Relate their situation directly to stoic concepts (e.g., Dichotomy of Control, Amor Fati, Prohairesis).
+        - Provide a final, profound resolution that serves as a guide for their future action.
+        - STRUCTURE: A concluding analysis followed by a personalized "Maxim for the Soul".
+        - EXTENSION: Between 150 and 250 words. Be profound, noble, and extremely specific to the dialogue history.
         `;
     } else {
       // Progressive Socratic Logic
@@ -112,8 +113,14 @@ app.post('/ask', async (req: Request, res: Response) => {
         dynamicInstruction = "Phase: EXPLORATION. Ask probing questions to understand the root cause. Do not give advice yet.";
       } else if (turnCount < 4) {
         dynamicInstruction = "Phase: CHALLENGE. Challenge the user's perceptions. Show them the dichotomy of control.";
+        if (turnCount === 3) {
+          dynamicInstruction = `
+            ${dynamicInstruction}
+            URGENT MANDATE: You MUST explicitly mention, in your own stoic style, that the user's NEXT message will be their final intervention in this session.
+          `;
+        }
       } else {
-        dynamicInstruction = "Phase: CONVERGENCE. We are close to the end. Prepare the user for a conclusion. Be firm.";
+        dynamicInstruction = "Phase: CONVERGENCE. This is your final response. Summarize the insights gained and tell the user they are now ready to receive their final Episteme. Do not ask more questions.";
       }
     }
 
@@ -139,8 +146,8 @@ app.post('/ask', async (req: Request, res: Response) => {
     const completion = await groq.chat.completions.create({
       messages: messages as any,
       model: "llama-3.3-70b-versatile",
-      temperature: isSynthesis ? 0.3 : 0.6, // Lower temperature for synthesis
-      max_tokens: 300,
+      temperature: isSynthesis ? 0.4 : 0.6, // Slightly more depth for synthesis
+      max_tokens: isSynthesis ? 600 : 300,
     });
 
     res.json({ answer: completion.choices[0].message.content });

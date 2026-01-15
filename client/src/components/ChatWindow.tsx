@@ -17,6 +17,8 @@ interface Props {
   currentTurn: number;
   maxTurns: number;
   onSynthesize: () => void;
+  isSynthesized: boolean;
+  onFinish: () => void;
 }
 
 export const ChatWindow = ({
@@ -30,7 +32,9 @@ export const ChatWindow = ({
   onSendMessage,
   currentTurn,
   maxTurns,
-  onSynthesize
+  onSynthesize,
+  isSynthesized,
+  onFinish
 }: Props) => {
   const [inputValue, setInputValue] = useState('');
   const isSessionComplete = currentTurn >= maxTurns;
@@ -105,18 +109,45 @@ export const ChatWindow = ({
       <div className={`p-3 border-t shrink-0 ${darkMode ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-100'
         }`}>
         {isSessionComplete ? (
-          <button
-            onClick={onSynthesize}
-            disabled={loading}
-            className={`w-full py-4 rounded-xl font-serif text-lg tracking-widest uppercase transition-all duration-500 animate-slide-up ${darkMode
-                ? 'bg-stone-100 text-stone-900 hover:bg-white shadow-[0_0_20px_rgba(255,255,255,0.1)]'
-                : 'bg-stone-800 text-white hover:bg-black shadow-[0_0_20px_rgba(0,0,0,0.2)]'
-              }`}
-          >
-            {loading
-              ? (lang === 'es' ? 'Sintetizando...' : 'Synthesizing...')
-              : (lang === 'es' ? 'Extraer Conclusión Estoica' : 'Extract Stoic Conclusion')}
-          </button>
+          <div className="flex flex-col gap-2 animate-slide-up">
+            {isSynthesized ? (
+              <>
+                <button
+                  onClick={onFinish}
+                  disabled={loading}
+                  className={`w-full py-4 rounded-xl font-serif text-lg tracking-widest uppercase transition-all duration-500 ${darkMode
+                    ? 'bg-stone-100 text-stone-900 hover:bg-white shadow-[0_0_20px_rgba(255,255,255,0.1)]'
+                    : 'bg-stone-800 text-white hover:bg-black shadow-[0_0_20px_rgba(0,0,0,0.2)]'
+                    }`}
+                >
+                  {lang === 'es' ? 'Cerrar y guardar episteme' : 'Save episteme & close'}
+                </button>
+                <button
+                  onClick={onClear}
+                  disabled={loading}
+                  className={`w-full py-2 rounded-xl font-serif text-xs tracking-[0.2em] uppercase transition-all duration-300 opacity-70 hover:opacity-100 ${darkMode
+                    ? 'text-stone-400 hover:text-stone-200 bg-stone-800/50'
+                    : 'text-stone-500 hover:text-stone-800 bg-stone-100'
+                    }`}
+                >
+                  {lang === 'es' ? 'Cerrar sin guardar' : 'Close without saving'}
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={onSynthesize}
+                disabled={loading}
+                className={`w-full py-4 rounded-xl font-serif text-lg tracking-widest uppercase transition-all duration-500 ${darkMode
+                  ? 'bg-stone-100 text-stone-900 hover:bg-white shadow-[0_0_20px_rgba(255,255,255,0.1)]'
+                  : 'bg-stone-800 text-white hover:bg-black shadow-[0_0_20px_rgba(0,0,0,0.2)]'
+                  }`}
+              >
+                {loading
+                  ? (lang === 'es' ? 'Sintetizando...' : 'Synthesizing...')
+                  : (lang === 'es' ? 'Obtener episteme' : 'Gain episteme')}
+              </button>
+            )}
+          </div>
         ) : (
           <form onSubmit={handleSubmit} className="flex gap-2">
             <input
