@@ -5,6 +5,9 @@ export interface Session {
     timestamp: number;
     mentor: string;
     summary?: string;
+    title?: string;
+    topic?: string;
+    category?: string;
     isCompleted: boolean;
 }
 

@@ -100,12 +100,21 @@ app.post('/ask', async (req: Request, res: Response) => {
 
     if (isSynthesis) {
       dynamicInstruction = `
-        TASK: SYNTHESIZE the entire preceding conversation into a comprehensive Stoic Episteme.
+        TASK: SYNTHESIZE the entire preceding conversation into a structured Stoic Episteme.
         - Analyze the specific conflict or doubt the user shared.
         - Relate their situation directly to stoic concepts (e.g., Dichotomy of Control, Amor Fati, Prohairesis).
-        - Provide a final, profound resolution that serves as a guide for their future action.
-        - STRUCTURE: A concluding analysis followed by a personalized "Maxim for the Soul".
-        - EXTENSION: Between 150 and 250 words. Be profound, noble, and extremely specific to the dialogue history.
+        - Provide a final, profound resolution.
+        
+        OUTPUT FORMAT: You MUST respond with a valid JSON object ONLY. Do not include any other text.
+        Structure:
+        {
+          "title": "A short poetic title (max 6 words)",
+          "topic": "The specific problem correctly identified (max 4 words)",
+          "category": "A general stoic category (e.g., Discipline, Emotions, Perspective)",
+          "summary": "The comprehensive analytical resolution (150-250 words)"
+        }
+        
+        Maintain historical accuracy and the speaker's tone within the text fields.
         `;
     } else {
       // Progressive Socratic Logic

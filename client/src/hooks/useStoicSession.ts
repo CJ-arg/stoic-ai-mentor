@@ -172,15 +172,39 @@ export const useStoicSession = (initialMentor: string, language: 'es' | 'en' = '
                 history
             });
 
+            const rawAnswer = response.data.answer;
+            let synthesisData;
+
+            try {
+                // Try to extract JSON if it's wrapped in markdown or has extra text
+                const jsonMatch = rawAnswer.match(/\{[\s\S]*\}/);
+                const jsonString = jsonMatch ? jsonMatch[0] : rawAnswer;
+                synthesisData = JSON.parse(jsonString);
+            } catch (jsonError) {
+                console.error("Failed to parse synthesis JSON:", jsonError);
+                // Fallback for non-JSON responses
+                synthesisData = {
+                    title: language === 'es' ? "Episteme profunda" : "Deep Episteme",
+                    topic: language === 'es' ? "Consulta estoica" : "Stoic inquiry",
+                    category: language === 'es' ? "Sabiduría" : "Wisdom",
+                    summary: rawAnswer
+                };
+            }
+
+            const { title, topic, category, summary } = synthesisData;
+
             await db.sessions.update(sessionId, {
-                summary: response.data.answer
+                summary,
+                title,
+                topic,
+                category
             });
 
             // Add the summary as a final message
             await db.messages.add({
                 sessionId,
                 role: 'bot',
-                text: `SYNTHESIS: ${response.data.answer}`,
+                text: `SYNTHESIS: ${summary}`,
                 timestamp: Date.now()
             });
 
