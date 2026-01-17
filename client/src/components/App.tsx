@@ -70,6 +70,11 @@ function App() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, loading]);
 
+  const handleFinishSession = async () => {
+    await finishSession();
+    setView('journal');
+  };
+
   if (isWarmingUp) return <LoadingScreen />;
 
   return (
@@ -136,7 +141,7 @@ function App() {
               maxTurns={5}
               onSynthesize={synthesizeWisdom}
               isSynthesized={isSynthesized}
-              onFinish={finishSession}
+              onFinish={handleFinishSession}
             />
           </>
         ) : (

@@ -219,10 +219,17 @@ export const useStoicSession = (initialMentor: string, language: 'es' | 'en' = '
         if (!sessionId) return;
         setLoading(true);
         try {
-            await db.sessions.update(sessionId, { isCompleted: true });
-            setSessionId(null); // Trigger fresh session for the UI
+            // Update explicitly and wait
+            await db.sessions.update(sessionId, {
+                isCompleted: true,
+                timestamp: Date.now() // Boost timestamp to show as most recent in journal
+            });
+
+            // Allow a tiny pulse for DB to propagate before clearing local state
+            await new Promise(resolve => setTimeout(resolve, 50));
+            setSessionId(null);
         } catch (e) {
-            console.error(e);
+            console.error("Critical: Failed to finish session", e);
         } finally {
             setLoading(false);
         }

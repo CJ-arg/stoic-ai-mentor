@@ -8,15 +8,11 @@ interface WisdomGalleryProps {
 }
 
 const WisdomGallery: React.FC<WisdomGalleryProps> = ({ darkMode, lang }) => {
-    const savedSessions = useLiveQuery(
-        async () => {
-            const all = await db.sessions.toArray();
-            return all
-                .filter(s => s.isCompleted && !!s.summary)
-                .sort((a, b) => b.timestamp - a.timestamp);
-        },
-        []
-    ) || [];
+    const allSessions = useLiveQuery(() => db.sessions.toArray(), []) || [];
+
+    const savedSessions = allSessions
+        .filter(s => s.isCompleted && s.summary)
+        .sort((a, b) => b.timestamp - a.timestamp);
 
     const handleDelete = async (id: number) => {
         const confirmMsg = lang === 'es'
