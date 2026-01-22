@@ -16,6 +16,7 @@ interface Props {
   // New Socratic Props
   currentTurn: number;
   maxTurns: number;
+  sessionType?: 'socratic' | 'practical';
   onSynthesize: () => void;
   isSynthesized: boolean;
   onFinish: () => void;
@@ -32,11 +33,13 @@ export const ChatWindow = ({
   onSendMessage,
   currentTurn,
   maxTurns,
+  sessionType = 'socratic',
   onSynthesize,
   isSynthesized,
   onFinish
 }: Props) => {
   const [inputValue, setInputValue] = useState('');
+  const isPractical = sessionType === 'practical';
   const isSessionComplete = currentTurn >= maxTurns;
 
   const handleSubmit = (e: FormEvent) => {
@@ -61,7 +64,7 @@ export const ChatWindow = ({
         </div>
 
         {/* Depth Counter in Center/Right */}
-        <DepthCounter currentTurn={currentTurn} maxTurns={maxTurns} />
+        <DepthCounter currentTurn={currentTurn} maxTurns={maxTurns} sessionType={sessionType} />
 
         <button
           onClick={() => {
@@ -144,7 +147,9 @@ export const ChatWindow = ({
               >
                 {loading
                   ? (lang === 'es' ? 'Sintetizando...' : 'Synthesizing...')
-                  : (lang === 'es' ? 'Obtener episteme' : 'Gain episteme')}
+                  : (isPractical
+                    ? (lang === 'es' ? 'Obtener llamado a la acción' : 'Get call to action')
+                    : (lang === 'es' ? 'Obtener episteme' : 'Gain episteme'))}
               </button>
             )}
           </div>

@@ -39,6 +39,11 @@ export const useStoicSession = (initialMentor: string, language: 'es' | 'en' = '
 
     const turnCount = Math.floor((messages.length - 1) / 2); // Subtract greeting, divide by 2 (User+Bot)
 
+    // NEW: Session Type detection
+    const sessionType = currentSession?.type || 'socratic';
+    const isPractical = sessionType === 'practical';
+    const maxTurns = isPractical ? 3 : 5;
+
     // Initialize or restore session
     useEffect(() => {
         let isMounted = true;
@@ -58,12 +63,28 @@ export const useStoicSession = (initialMentor: string, language: 'es' | 'en' = '
                 if (sessionId !== activeSession.id) {
                     setSessionId(activeSession.id);
                 }
+
+                // Check if we need to update the greeting language (only if it's the first message)
+                const firstMessage = await db.messages.where('sessionId').equals(activeSession.id).first();
+                if (firstMessage && firstMessage.role === 'bot') {
+                    const expectedGreeting = activeSession.type === 'practical'
+                        ? firstMessage.text // Don't auto-translate practical context-heavy greetings yet
+                        : mentorGreetings[initialMentor][language];
+
+                    if (activeSession.type !== 'practical' && firstMessage.text !== expectedGreeting) {
+                        const count = await db.messages.where('sessionId').equals(activeSession.id).count();
+                        if (count === 1) {
+                            await db.messages.update(firstMessage.id, { text: expectedGreeting });
+                        }
+                    }
+                }
             } else {
-                // 2. Create new session
+                // 2. Create new session (default to socratic)
                 const id = await db.sessions.add({
                     timestamp: Date.now(),
                     mentor: initialMentor,
-                    isCompleted: false
+                    isCompleted: false,
+                    type: 'socratic'
                 });
 
                 if (!isMounted) return;
@@ -83,7 +104,190 @@ export const useStoicSession = (initialMentor: string, language: 'es' | 'en' = '
         return () => { isMounted = false; };
     }, [initialMentor, language, sessionId]);
 
-    // Initial server wake-up (same as before)
+    const startPracticalAction = async (parentId: number) => {
+        setLoading(true);
+        try {
+            const parent = await db.sessions.get(parentId);
+            if (!parent) return;
+
+            // 1. Mark any active session as completed
+            if (sessionId) {
+                await db.sessions.update(sessionId, { isCompleted: true });
+            }
+
+            // 2. Create new practical session
+            const newId = await db.sessions.add({
+                timestamp: Date.now(),
+                mentor: initialMentor,
+                isCompleted: false,
+                type: 'practical',
+                parentId: parentId
+            });
+
+            setSessionId(newId);
+
+            // 3. Add context-aware greeting
+            const greeting = language === 'es'
+                ? `He recibido tu llamado a la acción. Recordemos tu conclusión: "${parent.summary?.substring(0, 100)}...". Tu nota personal fue: "${parent.userNote || 'Sin notas'}". 
+                   
+                   Dime, ¿cuál es el mayor obstáculo práctico que prevés para aplicar esta sabiduría hoy?`
+                : `I have received your call to action. Let us remember your conclusion: "${parent.summary?.substring(0, 100)}...". Your personal note: "${parent.userNote || 'No notes'}".
+                   
+                   Tell me, what is the biggest practical obstacle you foresee for applying this wisdom today?`;
+
+            await db.messages.add({
+                sessionId: newId,
+                role: 'bot',
+                text: greeting,
+                timestamp: Date.now()
+            });
+
+            // 4. Add automatic user prompt
+            const autoPrompt = language === 'es' ? 'Quiero aplicar este conocimiento en mi día a día.' : 'I want to apply this knowledge in my daily life.';
+            await sendMessage(autoPrompt, newId);
+
+        } catch (e) {
+            console.error("Failed to start practical action:", e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const sendMessage = async (text: string, forceId?: number) => {
+        const targetId = forceId || sessionId;
+        if (!targetId || !text.trim() || loading) return;
+
+        setLoading(true);
+
+        // Save User Message
+        await db.messages.add({
+            sessionId: targetId,
+            role: 'user',
+            text,
+            timestamp: Date.now()
+        });
+
+        try {
+            const historyMessages = await db.messages.where('sessionId').equals(targetId).toArray();
+            const history = historyMessages.map(m => ({
+                role: m.role === 'bot' ? 'assistant' : 'user',
+                content: m.text
+            }));
+
+            // Use dynamic turn count for practical sessions
+            const currentTurn = Math.floor((historyMessages.length - 1) / 2);
+
+            const response = await axios.post(`${API_URL}/ask`, {
+                prompt: text,
+                mentor: initialMentor,
+                language,
+                turnCount: currentTurn,
+                history,
+                sessionType: forceId ? 'practical' : sessionType
+            });
+
+            // Save Bot Message
+            await db.messages.add({
+                sessionId: targetId,
+                role: 'bot',
+                text: response.data.answer,
+                timestamp: Date.now()
+            });
+
+        } catch (error) {
+            console.error(error);
+            const errorMsg = language === 'es' ? 'El oráculo está silenciado.' : 'The oracle is silent.';
+            await db.messages.add({
+                sessionId: targetId,
+                role: 'bot',
+                text: errorMsg,
+                timestamp: Date.now()
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const synthesizeWisdom = async () => {
+        if (!sessionId || currentSession?.summary && !isPractical) return;
+        setLoading(true);
+
+        try {
+            const history = messages.map(m => ({
+                role: m.role === 'bot' ? 'assistant' : 'user',
+                content: m.text
+            }));
+
+            const response = await axios.post(`${API_URL}/ask`, {
+                prompt: isPractical ? "Give me my final Action Plan." : "Synthesize our conversation into one profound stoic truth.",
+                mentor: initialMentor,
+                language,
+                isSynthesis: true,
+                history,
+                sessionType
+            });
+
+            const rawAnswer = response.data.answer;
+
+            if (isPractical) {
+                // Save Action Plan to the parent session
+                if (currentSession?.parentId) {
+                    await db.sessions.update(currentSession.parentId, {
+                        actionPlan: rawAnswer
+                    });
+                }
+
+                // Also save to current session just in case
+                await db.sessions.update(sessionId, {
+                    summary: rawAnswer
+                });
+
+                await db.messages.add({
+                    sessionId,
+                    role: 'bot',
+                    text: language === 'es' ? `### LLAMADO A LA ACCIÓN (Askesis)\n\n${rawAnswer}` : `### CALL TO ACTION (Askesis)\n\n${rawAnswer}`,
+                    timestamp: Date.now()
+                });
+            } else {
+                let synthesisData;
+                try {
+                    const jsonMatch = rawAnswer.match(/\{[\s\S]*\}/);
+                    const jsonString = jsonMatch ? jsonMatch[0] : rawAnswer;
+                    synthesisData = JSON.parse(jsonString);
+                } catch (jsonError) {
+                    synthesisData = {
+                        title: language === 'es' ? "Episteme profunda" : "Deep Episteme",
+                        topic: language === 'es' ? "Consulta estoica" : "Stoic inquiry",
+                        category: language === 'es' ? "Sabiduría" : "Wisdom",
+                        summary: rawAnswer
+                    };
+                }
+
+                const { title, topic, category, summary } = synthesisData;
+
+                await db.sessions.update(sessionId, {
+                    summary,
+                    title,
+                    topic,
+                    category
+                });
+
+                await db.messages.add({
+                    sessionId,
+                    role: 'bot',
+                    text: `SYNTHESIS: ${summary}`,
+                    timestamp: Date.now()
+                });
+            }
+
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Initial server wake-up (restored)
     useEffect(() => {
         const wakeup = async () => {
             const startTime = Date.now();
@@ -103,129 +307,15 @@ export const useStoicSession = (initialMentor: string, language: 'es' | 'en' = '
         wakeup();
     }, [initialMentor, language]);
 
-    const sendMessage = async (text: string) => {
-        if (!sessionId || !text.trim() || loading) return;
-
-        setLoading(true);
-
-        // Save User Message
-        await db.messages.add({
-            sessionId,
-            role: 'user',
-            text,
-            timestamp: Date.now()
-        });
-
-        try {
-            // Send to API including history and turnCount context
-            // Note: We'll update server to handle this better, for now basic prompt
-            const history = messages.map(m => ({
-                role: m.role === 'bot' ? 'assistant' : 'user',
-                content: m.text
-            }));
-
-            const response = await axios.post(`${API_URL}/ask`, {
-                prompt: text,
-                mentor: initialMentor,
-                language,
-                turnCount, // Send current turn count for server-side logic
-                history // Optional: send history if server supports it later
-            });
-
-            // Save Bot Message
-            await db.messages.add({
-                sessionId,
-                role: 'bot',
-                text: response.data.answer,
-                timestamp: Date.now()
-            });
-
-        } catch (error) {
-            console.error(error);
-            const errorMsg = language === 'es' ? 'El oráculo está silenciado.' : 'The oracle is silent.';
-            await db.messages.add({
-                sessionId,
-                role: 'bot',
-                text: errorMsg,
-                timestamp: Date.now()
-            });
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const synthesizeWisdom = async () => {
-        if (!sessionId || currentSession?.summary) return;
-        setLoading(true);
-
-        try {
-            const history = messages.map(m => ({
-                role: m.role === 'bot' ? 'assistant' : 'user',
-                content: m.text
-            }));
-
-            const response = await axios.post(`${API_URL}/ask`, {
-                prompt: "Synthesize our conversation into one profound stoic truth.",
-                mentor: initialMentor,
-                language,
-                isSynthesis: true,
-                history
-            });
-
-            const rawAnswer = response.data.answer;
-            let synthesisData;
-
-            try {
-                // Try to extract JSON if it's wrapped in markdown or has extra text
-                const jsonMatch = rawAnswer.match(/\{[\s\S]*\}/);
-                const jsonString = jsonMatch ? jsonMatch[0] : rawAnswer;
-                synthesisData = JSON.parse(jsonString);
-            } catch (jsonError) {
-                console.error("Failed to parse synthesis JSON:", jsonError);
-                // Fallback for non-JSON responses
-                synthesisData = {
-                    title: language === 'es' ? "Episteme profunda" : "Deep Episteme",
-                    topic: language === 'es' ? "Consulta estoica" : "Stoic inquiry",
-                    category: language === 'es' ? "Sabiduría" : "Wisdom",
-                    summary: rawAnswer
-                };
-            }
-
-            const { title, topic, category, summary } = synthesisData;
-
-            await db.sessions.update(sessionId, {
-                summary,
-                title,
-                topic,
-                category
-            });
-
-            // Add the summary as a final message
-            await db.messages.add({
-                sessionId,
-                role: 'bot',
-                text: `SYNTHESIS: ${summary}`,
-                timestamp: Date.now()
-            });
-
-        } catch (e) {
-            console.error(e);
-        } finally {
-            setLoading(false);
-        }
-    };
-
     const finishSession = async () => {
         if (!sessionId) return;
         setLoading(true);
         try {
-            // Update explicitly and wait
             await db.sessions.update(sessionId, {
                 isCompleted: true,
-                timestamp: Date.now() // Boost timestamp to show as most recent in journal
+                timestamp: Date.now()
             });
 
-            // Allow a tiny pulse for DB to propagate before clearing local state
             await new Promise(resolve => setTimeout(resolve, 50));
             setSessionId(null);
         } catch (e) {
@@ -233,14 +323,13 @@ export const useStoicSession = (initialMentor: string, language: 'es' | 'en' = '
         } finally {
             setLoading(false);
         }
-    }
+    };
 
     const resetSession = async () => {
-        // Mark current as completed if not already (abandoned)
         if (sessionId) {
             await db.sessions.update(sessionId, { isCompleted: true });
         }
-        setSessionId(null); // Trigger effect to create new one
+        setSessionId(null);
     };
 
     return {
@@ -250,6 +339,9 @@ export const useStoicSession = (initialMentor: string, language: 'es' | 'en' = '
         sendMessage,
         isWarmingUp,
         turnCount,
+        maxTurns,
+        sessionType,
+        startPracticalAction,
         synthesizeWisdom,
         finishSession,
         resetSession,

@@ -31,7 +31,10 @@ function App() {
     isWarmingUp,
     resetSession,
     turnCount,
+    maxTurns,
+    sessionType,
     synthesizeWisdom,
+    startPracticalAction,
     finishSession,
     isSynthesized
   } = useStoicSession(mentorId, lang);
@@ -73,6 +76,11 @@ function App() {
   const handleFinishSession = async () => {
     await finishSession();
     setView('journal');
+  };
+
+  const handlePracticalAction = async (id: number) => {
+    await startPracticalAction(id);
+    setView('chat');
   };
 
   if (isWarmingUp) return <LoadingScreen />;
@@ -138,7 +146,8 @@ function App() {
               onSendMessage={sendMessage}
               scrollRef={scrollRef}
               currentTurn={turnCount}
-              maxTurns={5}
+              maxTurns={maxTurns}
+              sessionType={sessionType}
               onSynthesize={synthesizeWisdom}
               isSynthesized={isSynthesized}
               onFinish={handleFinishSession}
@@ -146,7 +155,11 @@ function App() {
           </>
         ) : (
           <div className="w-full h-full pb-8">
-            <WisdomGallery darkMode={darkMode} lang={lang} />
+            <WisdomGallery
+              darkMode={darkMode}
+              lang={lang}
+              onPracticalAction={handlePracticalAction}
+            />
           </div>
         )}
       </main>

@@ -8,6 +8,10 @@ export interface Session {
     title?: string;
     topic?: string;
     category?: string;
+    userNote?: string;
+    actionPlan?: string;
+    type: 'socratic' | 'practical';
+    parentId?: number;
     isCompleted: boolean;
 }
 

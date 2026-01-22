@@ -84,7 +84,7 @@ app.get('/api/translated-quote', async (_req: Request, res: Response) => {
 // MAIN ENDPOINT: /ask (Handles Chat, Wake-up Call, and Synthesis)
 app.post('/ask', async (req: Request, res: Response) => {
   try {
-    const { prompt, mentor, language = 'es', turnCount = 0, isSynthesis = false, history = [] } = req.body;
+    const { prompt, mentor, language = 'es', turnCount = 0, isSynthesis = false, history = [], sessionType = 'socratic' } = req.body;
 
     // 1. FAST RESPONSE: Wake-up call handling
     if (prompt === "Wake up" || prompt === "Despierta") {
@@ -99,37 +99,59 @@ app.post('/ask', async (req: Request, res: Response) => {
     let dynamicInstruction = "";
 
     if (isSynthesis) {
-      dynamicInstruction = `
-        TASK: SYNTHESIZE the entire preceding conversation into a structured Stoic Episteme.
-        - Analyze the specific conflict or doubt the user shared.
-        - Relate their situation directly to stoic concepts (e.g., Dichotomy of Control, Amor Fati, Prohairesis).
-        - Provide a final, profound resolution.
-        
-        OUTPUT FORMAT: You MUST respond with a valid JSON object ONLY. Do not include any other text.
-        Structure:
-        {
-          "title": "A short poetic title (max 6 words)",
-          "topic": "The specific problem correctly identified (max 4 words)",
-          "category": "A general stoic category (e.g., Discipline, Emotions, Perspective)",
-          "summary": "The comprehensive analytical resolution (150-250 words)"
-        }
-        
-        Maintain historical accuracy and the speaker's tone within the text fields.
+      if (sessionType === 'practical') {
+        dynamicInstruction = `
+          TASK: Create a PRACTICAL ACTION PLAN (Askesis) based on our short dialogue.
+          - Combine the previous Episteme with the user's practical notes.
+          - Define 1 concrete, immediate action the user can take today.
+          - Explain concisely why this action aligns with Stoic virtue.
+          - EXTENSION: Max 100 words. Be sharp, direct, and encouraging.
+          OUTPUT: Return ONLY the text of the action plan.
         `;
-    } else {
-      // Progressive Socratic Logic
-      if (turnCount < 2) {
-        dynamicInstruction = "Phase: EXPLORATION. Ask probing questions to understand the root cause. Do not give advice yet.";
-      } else if (turnCount < 4) {
-        dynamicInstruction = "Phase: CHALLENGE. Challenge the user's perceptions. Show them the dichotomy of control.";
-        if (turnCount === 3) {
-          dynamicInstruction = `
-            ${dynamicInstruction}
-            URGENT MANDATE: You MUST explicitly mention, in your own stoic style, that the user's NEXT message will be their final intervention in this session.
+      } else {
+        dynamicInstruction = `
+          TASK: SYNTHESIZE the entire preceding conversation into a structured Stoic Episteme.
+          - Analyze the specific conflict or doubt the user shared.
+          - Relate their situation directly to stoic concepts (e.g., Dichotomy of Control, Amor Fati, Prohairesis).
+          - Provide a final, profound resolution.
+          
+          OUTPUT FORMAT: You MUST respond with a valid JSON object ONLY. Do not include any other text.
+          Structure:
+          {
+            "title": "A short poetic title (max 6 words)",
+            "topic": "The specific problem correctly identified (max 4 words)",
+            "category": "A general stoic category (e.g., Discipline, Emotions, Perspective)",
+            "summary": "The comprehensive analytical resolution (150-250 words)"
+          }
+          
+          Maintain historical accuracy and the speaker's tone within the text fields.
           `;
+      }
+    } else {
+      if (sessionType === 'practical') {
+        // 3-Turn Practical Logic
+        if (turnCount === 0) {
+          dynamicInstruction = "Phase: OBSTACLE IDENTIFICATION. The user wants to apply their knowledge. Ask about the biggest practical obstacle they foresee in the next 24 hours.";
+        } else if (turnCount === 1) {
+          dynamicInstruction = "Phase: STRATEGY. Suggest a stoic technique (e.g., Premeditatio Malorum) to handle that obstacle.";
+        } else {
+          dynamicInstruction = "Phase: COMMITMENT. This is the last turn. Tell the user they are ready for their concrete Action Plan. Do not ask more questions.";
         }
       } else {
-        dynamicInstruction = "Phase: CONVERGENCE. This is your final response. Summarize the insights gained and tell the user they are now ready to receive their final Episteme. Do not ask more questions.";
+        // Progressive Socratic Logic (5-Turn)
+        if (turnCount < 2) {
+          dynamicInstruction = "Phase: EXPLORATION. Ask probing questions to understand the root cause. Do not give advice yet.";
+        } else if (turnCount < 4) {
+          dynamicInstruction = "Phase: CHALLENGE. Challenge the user's perceptions. Show them the dichotomy of control.";
+          if (turnCount === 3) {
+            dynamicInstruction = `
+              ${dynamicInstruction}
+              URGENT MANDATE: You MUST explicitly mention, in your own stoic style, that the user's NEXT message will be their final intervention in this session.
+            `;
+          }
+        } else {
+          dynamicInstruction = "Phase: CONVERGENCE. This is your final response. Summarize the insights gained and tell the user they are now ready to receive their final Episteme. Do not ask more questions.";
+        }
       }
     }
 
